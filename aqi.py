@@ -55,6 +55,9 @@ def getAqiDescriptiveFeature(descriptions, feature, aqi):
     Returns:
         Pandas dataframe
     """
+    if not aqi:
+        return None
+
     return descriptions[(descriptions['aqi_lo'] <= aqi) & (descriptions['aqi_hi'] > aqi)].iloc[0][feature]
 
 

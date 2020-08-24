@@ -9,6 +9,13 @@ import aqi  # Calculating AQI.
 from datetime import datetime as dt
 
 
+def getCarefullyFromDict(d, key):
+    if d.__contains__(key):
+        return d[key]
+    else:
+        return None
+
+
 class AirDatabase(object):
     """
     Initializes and manipulates PostgreSQL database.
@@ -155,26 +162,6 @@ class AirDatabase(object):
         else:
             print('created hourly_weather_forecast table')
 
-    def row_in_lib(self, data):
-        """
-        Check if row is already in database.
-
-        Args:
-            data: sensor data in json/dictionary format.
-
-        Returns:
-            Boolean
-        """
-        try:
-            self.cur.execute("SELECT * FROM sensor_data "
-                             "WHERE id = %(Id)s and measurement_ts = %(DateTime)s",
-                             data)
-        except psycopg2.ProgrammingError as e:
-            print(e)
-            self.conn.rollback()
-        else:
-            return self.cur.rowcount != 0
-
     def insert_sensor_row(self, data):
         """
         Add a row of sensor data to the air database.
@@ -185,59 +172,57 @@ class AirDatabase(object):
         Returns:
             NULL
         """
-        if not self.row_in_lib(data):
-            data["temp_c"] = (data["current_temp_f"] - 32) * (5 / 9)
+        data["temp_c"] = (data["current_temp_f"] - 32) * (5 / 9)
 
-            breakpoints = aqi.loadAqiBreakpoints()
-            descriptions = aqi.loadAqiDescriptiveInfo()
+        breakpoints = aqi.loadAqiBreakpoints()
+        descriptions = aqi.loadAqiDescriptiveInfo()
 
-            data["pm_10_0_aqi"] = aqi.getAqi(
-                data['pm10_0_cf_1'], breakpoints)
-            data["pm_10_0_aqi_rgb"] = aqi.aqiColor(
-                data['pm_10_0_aqi'], descriptions)
-            data['pm_10_0_aqi_description'] = aqi.aqiDescription(
-                data['pm_10_0_aqi'], descriptions)
-            data['pm_10_0_aqi_message'] = aqi.aqiMessage(
-                data['pm_10_0_aqi'], descriptions)
+        data["pm_10_0_aqi"] = aqi.getAqi(
+            data['pm10_0_cf_1'], breakpoints)
+        data["pm_10_0_aqi_rgb"] = aqi.aqiColor(
+            data['pm_10_0_aqi'], descriptions)
+        data['pm_10_0_aqi_description'] = aqi.aqiDescription(
+            data['pm_10_0_aqi'], descriptions)
+        data['pm_10_0_aqi_message'] = aqi.aqiMessage(
+            data['pm_10_0_aqi'], descriptions)
 
-            data['p25aqic'] = aqi.aqiColor(data['pm2.5_aqi'], descriptions)
-            data['pm_2_5_aqi_description'] = aqi.aqiDescription(
-                data['pm2.5_aqi'], descriptions)
-            data['pm_2_5_aqi_message'] = aqi.aqiMessage(
-                data['pm2.5_aqi'], descriptions)
+        data['p25aqic'] = aqi.aqiColor(data['pm2.5_aqi'], descriptions)
+        data['pm_2_5_aqi_description'] = aqi.aqiDescription(
+            data['pm2.5_aqi'], descriptions)
+        data['pm_2_5_aqi_message'] = aqi.aqiMessage(
+            data['pm2.5_aqi'], descriptions)
 
-            try:
-                print('inserting new obs into sensor_data table...')
+        try:
+            print('inserting new obs into sensor_data table...')
 
-                self.cur.execute("INSERT INTO sensor_data (id, sensor_id, place"
-                                 ", version, hardware_version, uptime_s, rssi_dbm"
-                                 ", measurement_ts, temp_f, temp_c, humidity"
-                                 ", dewpoint_f, pressure_mbar, pm_2_5_aqi"
-                                 ", pm_2_5_aqi_rgb, pm_2_5_aqi_description"
-                                 ", pm_2_5_aqi_message, pm_10_0_aqi"
-                                 ", pm_10_0_aqi_rgb, pm_10_0_aqi_description "
-                                 ", pm_10_0_aqi_message"
-                                 ", pm_1_0_um_m3, pm_2_5_um_m3, pm_10_0_um_m3"
-                                 ", p_0_3_count_dl, p_0_5_count_dl, p_1_0_count_dl"
-                                 ", p_2_5_count_dl, p_5_0_count_dl, p_10_0_count_dl"
-                                 ") "
-                                 "VALUES (%(Id)s, %(SensorId)s, %(place)s"
-                                 ", %(version)s, %(hardwareversion)s, %(uptime)s, %(rssi)s"
-                                 ", %(DateTime)s, %(current_temp_f)s, %(temp_c)s, %(current_humidity)s"
-                                 ", %(current_dewpoint_f)s, %(pressure)s, %(pm2.5_aqi)s"
-                                 ", %(p25aqic)s, %(pm_2_5_aqi_description)s, %(pm_2_5_aqi_message)s"
-                                 ", %(pm_10_0_aqi)s, %(pm_10_0_aqi_rgb)s"
-                                 ", %(pm_10_0_aqi_description)s, %(pm_10_0_aqi_message)s"
-                                 ", %(pm1_0_cf_1)s, %(pm2_5_cf_1)s, %(pm10_0_cf_1)s"
-                                 ", %(p_0_3_um)s, %(p_0_5_um)s, %(p_1_0_um)s"
-                                 ", %(p_2_5_um)s, %(p_5_0_um)s, %(p_10_0_um)s)",
-                                 data)
-            except psycopg2.ProgrammingError as e:
-                print('failed: ', e)
-                self.conn.rollback()
-            else:
-                self.conn.commit()  # Make database changes persistent.
-                print('success!')
+            self.cur.execute("INSERT INTO sensor_data (id, sensor_id, place"
+                             ", version, hardware_version, uptime_s, rssi_dbm"
+                             ", measurement_ts, temp_f, temp_c, humidity"
+                             ", dewpoint_f, pressure_mbar, pm_2_5_aqi"
+                             ", pm_2_5_aqi_rgb, pm_2_5_aqi_description"
+                             ", pm_2_5_aqi_message, pm_10_0_aqi"
+                             ", pm_10_0_aqi_rgb, pm_10_0_aqi_description "
+                             ", pm_10_0_aqi_message"
+                             ", pm_1_0_um_m3, pm_2_5_um_m3, pm_10_0_um_m3"
+                             ", p_0_3_count_dl, p_0_5_count_dl, p_1_0_count_dl"
+                             ", p_2_5_count_dl, p_5_0_count_dl, p_10_0_count_dl"
+                             ") "
+                             "VALUES (%(Id)s, %(SensorId)s, %(place)s"
+                             ", %(version)s, %(hardwareversion)s, %(uptime)s, %(rssi)s"
+                             ", %(DateTime)s, %(current_temp_f)s, %(temp_c)s, %(current_humidity)s"
+                             ", %(current_dewpoint_f)s, %(pressure)s, %(pm2.5_aqi)s"
+                             ", %(p25aqic)s, %(pm_2_5_aqi_description)s, %(pm_2_5_aqi_message)s"
+                             ", %(pm_10_0_aqi)s, %(pm_10_0_aqi_rgb)s"
+                             ", %(pm_10_0_aqi_description)s, %(pm_10_0_aqi_message)s"
+                             ", %(pm1_0_cf_1)s, %(pm2_5_cf_1)s, %(pm10_0_cf_1)s"
+                             ", %(p_0_3_um)s, %(p_0_5_um)s, %(p_1_0_um)s"
+                             ", %(p_2_5_um)s, %(p_5_0_um)s, %(p_10_0_um)s)",
+                             data)
+        except (psycopg2.ProgrammingError, psycopg2.errors.UniqueViolation, KeyError) as e:
+            print('failed: ', e)
+            self.conn.rollback()
+        else:
+            self.conn.commit()  # Make database changes persistent.
 
     def table_exists(self, table_name):
         """
@@ -269,16 +254,15 @@ class AirDatabase(object):
         Returns:
             NULL
         """
-        if self.row_in_lib(data):
-            try:
-                self.cur.execute("DELETE FROM sensor_data "
-                                 "WHERE id = %(Id)s and measurement_ts = %(DateTime)s",
-                                 data)
-            except psycopg2.ProgrammingError as e:
-                print(e)
-                self.conn.rollback()
-            else:
-                print('deleted row from sensor_data table')
+        try:
+            self.cur.execute("DELETE FROM sensor_data "
+                             "WHERE id = %(Id)s and measurement_ts = %(DateTime)s",
+                             data)
+        except psycopg2.ProgrammingError as e:
+            print(e)
+            self.conn.rollback()
+        else:
+            print('deleted row from sensor_data table')
 
     def del_all(self, table_name):
         """
@@ -346,8 +330,9 @@ class AirDatabase(object):
 
         cleanData["time"] = dt.fromtimestamp(data["current"]["dt"])
 
-        cleanData["timezone_offset"] = data["timezone_offset"]
-        cleanData["timezone"] = data["timezone"]
+        cleanData["timezone_offset"] = getCarefullyFromDict(
+            data, "timezone_offset")
+        cleanData["timezone"] = getCarefullyFromDict(data, "timezone")
 
         cleanData["temp_f"] = data["current"]["temp"]
         cleanData["temp_c"] = (data["current"]["temp"] - 32) * (5 / 9)
@@ -379,11 +364,10 @@ class AirDatabase(object):
             self.insert_daily_forecast_row(data)
             self.insert_hourly_forecast_row(data)
 
-        except (psycopg2.ProgrammingError, psycopg2.errors.UniqueViolation) as e:
+        except (psycopg2.ProgrammingError, psycopg2.errors.UniqueViolation, KeyError) as e:
             print('failed: ', e)
             self.conn.rollback()
         else:
-            print('success!')
             self.conn.commit()
 
     def insert_daily_forecast_row(self, data):
@@ -407,10 +391,12 @@ class AirDatabase(object):
 
         cleanData = dict()
 
-        cleanData["timezone_offset"] = data["timezone_offset"]
-        cleanData["timezone"] = data["timezone"]
+        cleanData["timezone_offset"] = getCarefullyFromDict(
+            data, "timezone_offset")
+        cleanData["timezone"] = getCarefullyFromDict(data, "timezone")
 
-        dataList = data["daily"]  # List of dicts, one per day.
+        # List of dicts, one per day.
+        dataList = getCarefullyFromDict(data, "daily")
 
         try:
             print('inserting new obs into daily_weather_forecast table...')
@@ -431,8 +417,8 @@ class AirDatabase(object):
                 cleanData["detail_weather_descrip"] = data["weather"][0]["description"]
                 cleanData["weather_icon"] = data["weather"][0]["icon"]
 
-                cleanData["precip_chance"] = data["pop"]
-                cleanData["uvi"] = data["uvi"]
+                cleanData["precip_chance"] = getCarefullyFromDict(data, "pop")
+                cleanData["uvi"] = getCarefullyFromDict(data, "uvi")
 
                 self.cur.execute("INSERT INTO daily_weather_forecast ( "
                                  "ts, timezone, ts_offset "
@@ -450,11 +436,10 @@ class AirDatabase(object):
                                  ") ",
                                  cleanData)
 
-        except (psycopg2.ProgrammingError, psycopg2.errors.UniqueViolation) as e:
+        except (psycopg2.ProgrammingError, psycopg2.errors.UniqueViolation, KeyError) as e:
             print('failed: ', e)
             self.conn.rollback()
         else:
-            print('success!')
             self.conn.commit()
 
     def insert_hourly_forecast_row(self, data):
@@ -478,11 +463,12 @@ class AirDatabase(object):
 
         cleanData = dict()
 
-        cleanData["timezone_offset"] = data["timezone_offset"]
-        cleanData["timezone"] = data["timezone"]
+        cleanData["timezone_offset"] = getCarefullyFromDict(
+            data, "timezone_offset")
+        cleanData["timezone"] = getCarefullyFromDict(data, "timezone")
 
         # List of dicts, one per hour of the next several days.
-        dataList = data["hourly"]
+        dataList = getCarefullyFromDict(data, "hourly")
 
         try:
             print('inserting new obs into hourly_weather_forecast table...')
@@ -493,15 +479,16 @@ class AirDatabase(object):
 
                 cleanData["temp_f"] = round(data["temp"], 2)
                 cleanData["temp_c"] = round((data["temp"] - 32) * (5 / 9), 2)
-                cleanData["humidity"] = data["humidity"]
-                cleanData["dewpoint_f"] = data["dew_point"]
+                cleanData["humidity"] = getCarefullyFromDict(data, "humidity")
+                cleanData["dewpoint_f"] = getCarefullyFromDict(
+                    data, "dew_point")
 
                 cleanData["weather_type_id"] = data["weather"][0]["id"]
                 cleanData["short_weather_descrip"] = data["weather"][0]["main"]
                 cleanData["detail_weather_descrip"] = data["weather"][0]["description"]
                 cleanData["weather_icon"] = data["weather"][0]["icon"]
 
-                cleanData["precip_chance"] = data["pop"]
+                cleanData["precip_chance"] = getCarefullyFromDict(data, "pop")
 
                 self.cur.execute("INSERT INTO hourly_weather_forecast ( "
                                  "ts, timezone, ts_offset "
@@ -519,11 +506,10 @@ class AirDatabase(object):
                                  ") ",
                                  cleanData)
 
-        except (psycopg2.ProgrammingError, psycopg2.errors.UniqueViolation) as e:
+        except (psycopg2.ProgrammingError, psycopg2.errors.UniqueViolation, KeyError) as e:
             print('failed: ', e)
             self.conn.rollback()
         else:
-            print('success!')
             self.conn.commit()
 
     def load_historal_data(self):

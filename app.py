@@ -427,10 +427,10 @@ def updateHourlyForecast(forecastsToDisplay, tempUnit, n):
     if 'hourly' not in forecastsToDisplay:
         return []
 
+    return 'Hourly forecast display not yet implemented'
+
     tempSelector = {'temp_f': ['min_f', 'max_f'], 'temp_c': ['min_c', 'max_c']}
     degreeUnit = {'temp_f': '°F', 'temp_c': '°C'}
-
-    return 'Hourly forecast display not yet implemented'
 
 
 if __name__ == '__main__':
