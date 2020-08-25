@@ -9,15 +9,15 @@ Visualizing PurpleAir sensor data with Plotly Dash.
     ```
     dokku apps:create app-name
     ```
-    * Install Postgres plugin:
+    * Install Postgres plugin.
     ```
     sudo dokku plugin:install https://github.com/dokku/dokku-postgres.git
     ```
-    * Create a Postgres database:
+    * Create a Postgres database.
     ```
     dokku postgres:create databasename
     ```
-    * Link the database and app:
+    * Link the database and app.
     ```
     dokku postgres:link databasename app-name
     ``` 
