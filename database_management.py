@@ -33,14 +33,15 @@ class AirDatabase(object):
         try:
             self.cur.execute("CREATE TABLE sensor_data ( "
                              # Metadata
-                             "id numeric PRIMARY KEY "  # Implied UNIQUE and NOT NULL constraint
+                             "id numeric "
                              ", sensor_id text "
                              ", place text "
                              ", version text "
                              ", hardware_version text "
                              ", uptime_s numeric CHECK (uptime_s >= 0) "
                              ", rssi_dbm numeric "
-                             ", measurement_ts timestamptz UNIQUE "
+                             # Implied UNIQUE and NOT NULL constraint
+                             ", measurement_ts timestamptz PRIMARY KEY "
 
                              # Environment data
                              ", temp_f numeric "
@@ -82,8 +83,8 @@ class AirDatabase(object):
         # Create table of outside weather data.
         try:
             self.cur.execute("CREATE TABLE weather_data ("
-                             "id SERIAL PRIMARY KEY "  # Implied UNIQUE and NOT NULL constraint; auto-incrementing
-                             ", ts timestamptz UNIQUE "
+                             "id SERIAL " # Auto-incrementing
+                             ", ts timestamptz PRIMARY KEY " # Implied UNIQUE and NOT NULL constraint
                              ", timezone text "
                              ", ts_offset numeric "
 
@@ -108,8 +109,8 @@ class AirDatabase(object):
         # Create table of daily weather forecast.
         try:
             self.cur.execute("CREATE TABLE daily_weather_forecast ("
-                             "id SERIAL PRIMARY KEY "  # Implied UNIQUE and NOT NULL constraint; auto-incrementing
-                             ", ts timestamptz UNIQUE "
+                             "id SERIAL " # Auto-incrementing
+                             ", ts timestamptz PRIMARY KEY " # Implied UNIQUE and NOT NULL constraint
                              ", timezone text "
                              ", ts_offset numeric "
 
@@ -137,8 +138,8 @@ class AirDatabase(object):
         # Create table of hourly weather forecast.
         try:
             self.cur.execute("CREATE TABLE hourly_weather_forecast ("
-                             "id SERIAL PRIMARY KEY "  # Implied UNIQUE and NOT NULL constraint; auto-incrementing
-                             ", ts timestamptz UNIQUE "
+                             "id SERIAL " # Auto-incrementing
+                             ", ts timestamptz PRIMARY KEY " # Implied UNIQUE and NOT NULL constraint
                              ", timezone text "
                              ", ts_offset numeric "
 

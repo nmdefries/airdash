@@ -7,17 +7,19 @@ import psycopg2
 import user_settings as us
 
 
-def fetchSensorData(conn, varName, standardDate=us.defaultTimeRange, customDate=None, queryFields=None, timezone=us.timezone):
+def fetchSensorData(pool, varName, standardDate=us.defaultTimeRange, customDate=None, queryFields=None, timezone=us.timezone):
     """
     Fetch updated data for a single variable or a list of variables when date range is changed.
 
     Args:
         varName: str or list of str corresponding to fields in the sensor_data table
-        standardDate: str 
+        standardDate: str
 
     Returns:
         pandas dataframe of data fetched
     """
+    conn = pool.getconn()
+    conn.set_session(readonly=True)
     cur = conn.cursor()
 
     if isinstance(varName, str):
@@ -34,6 +36,8 @@ def fetchSensorData(conn, varName, standardDate=us.defaultTimeRange, customDate=
         queryFields = ', '.join(['measurement_ts'] + queryFields)
 
     records = None
+
+    print("getting sensor data from database...")
 
     # Get data from database within desired time frame.
     if standardDate != 'custom':
@@ -64,11 +68,14 @@ def fetchSensorData(conn, varName, standardDate=us.defaultTimeRange, customDate=
             print('no data in selected timeframe, creating empty dataframe')
             records = pd.DataFrame(columns=names)
 
+    print("got data")
+
     cur.close()
+    pool.putconn(conn)
     return records
 
 
-def fetchAqiWarningInfo(conn, aqiSpecies=['pm_2_5_aqi', 'pm_10_0_aqi'], standardDate=us.defaultTimeRange, customDate=None):
+def fetchAqiWarningInfo(pool, aqiSpecies=['pm_2_5_aqi', 'pm_10_0_aqi'], standardDate=us.defaultTimeRange, customDate=None):
     varNames = ['rgb', 'description', 'message']
 
     # AQI warning text and color.
@@ -94,7 +101,7 @@ def fetchAqiWarningInfo(conn, aqiSpecies=['pm_2_5_aqi', 'pm_10_0_aqi'], standard
 
     try:
         # First (most recent) row of warning info.
-        warnings = fetchSensorData(conn,
+        warnings = fetchSensorData(pool,
                                    varNames, standardDate, customDate, warningVars).iloc[0]
 
         warningMessage = [warnings['description'], '.\r', warnings['message']]
@@ -108,7 +115,7 @@ def fetchAqiWarningInfo(conn, aqiSpecies=['pm_2_5_aqi', 'pm_10_0_aqi'], standard
     return warningMessage, style
 
 
-def fetchWeatherDataNewTimeRange(conn, varName, standardDate=us.defaultTimeRange, customDate=None, timezone=us.timezone):
+def fetchWeatherDataNewTimeRange(pool, varName, standardDate=us.defaultTimeRange, customDate=None, timezone=us.timezone):
     """
     Fetch updated data for a single variable or a list of variables when date range is changed.
 
@@ -118,6 +125,8 @@ def fetchWeatherDataNewTimeRange(conn, varName, standardDate=us.defaultTimeRange
     Returns:
         pandas dataframe of data fetched
     """
+    conn = pool.getconn()
+    conn.set_session(readonly=True)
     cur = conn.cursor()
 
     if isinstance(varName, str):
@@ -127,6 +136,8 @@ def fetchWeatherDataNewTimeRange(conn, varName, standardDate=us.defaultTimeRange
     queryFields = ', '.join(names)
 
     records = None
+
+    print("getting weather data from database...")
 
     # Get data from database.
     if standardDate != 'custom':
@@ -156,11 +167,14 @@ def fetchWeatherDataNewTimeRange(conn, varName, standardDate=us.defaultTimeRange
             print('no data in selected timeframe, creating empty dataframe')
             records = pd.DataFrame(columns=names)
 
+    print("got data")
+
     cur.close()
+    pool.putconn(conn)
     return records
 
 
-def fetchForecastData(conn, varName, tableName, timezone=us.timezone):
+def fetchForecastData(pool, varName, tableName, timezone=us.timezone):
     """
     Fetch all daily forecast data.
 
@@ -170,6 +184,8 @@ def fetchForecastData(conn, varName, tableName, timezone=us.timezone):
     Returns:
         pandas dataframe of data fetched
     """
+    conn = pool.getconn()
+    conn.set_session(readonly=True)
     cur = conn.cursor()
 
     if isinstance(varName, str):
@@ -177,6 +193,8 @@ def fetchForecastData(conn, varName, tableName, timezone=us.timezone):
 
     names = ['ts'] + varName
     queryFields = ', '.join(names)
+
+    print("getting weather forecast from database...")
 
     # Get data from database.
     cur.execute(
@@ -193,16 +211,19 @@ def fetchForecastData(conn, varName, tableName, timezone=us.timezone):
         print('no data in selected timeframe, creating empty dataframe')
         records = pd.DataFrame(columns=names)
 
+    print('got data')
+
     cur.close()
+    pool.putconn(conn)
     return records
 
 
-def fetchDailyForecastData(conn, varName, timezone=us.timezone):
-    return fetchForecastData(conn, varName, "daily_weather_forecast", timezone)
+def fetchDailyForecastData(pool, varName, timezone=us.timezone):
+    return fetchForecastData(pool, varName, "daily_weather_forecast", timezone)
 
 
-def fetchHourlyForecastData(conn, varName, timezone=us.timezone):
-    return fetchForecastData(conn, varName, "hourly_weather_forecast", timezone)
+def fetchHourlyForecastData(pool, varName, timezone=us.timezone):
+    return fetchForecastData(pool, varName, "hourly_weather_forecast", timezone)
 
 
 def correctTemp(records, tempUnit):
@@ -239,11 +260,11 @@ def temp_vs_time(records, species="temp_f", margin=defaultMargin):
 
     fig = go.Figure()
 
-    fig.add_trace(go.Scatter(x=records["measurement_ts"],
-                             y=records[species],
-                             mode='markers+lines',
-                             hovertemplate='%{y:.0f}',
-                             name='Sensor'))
+    fig.add_trace(go.Scattergl(x=records["measurement_ts"],
+                               y=records[species],
+                               mode='markers+lines',
+                               hovertemplate='%{y:.0f}',
+                               name='Sensor'))
 
     fig.update_layout(margin=margin,
                       hovermode="x",
@@ -270,11 +291,11 @@ def humid_vs_time(records, margin=defaultMargin):
 
     fig = go.Figure()
 
-    fig.add_trace(go.Scatter(x=records["measurement_ts"],
-                             y=records["humidity"],
-                             mode='markers+lines',
-                             hovertemplate='%{y}',
-                             name='Sensor'))
+    fig.add_trace(go.Scattergl(x=records["measurement_ts"],
+                               y=records["humidity"],
+                               mode='markers+lines',
+                               hovertemplate='%{y}',
+                               name='Sensor'))
 
     fig.update_layout(margin=margin,
                       hovermode="x",
@@ -365,7 +386,7 @@ def aqi_vs_time(records, species=["pm_2_5_aqi", "pm_10_0_aqi"], margin=defaultMa
 
     # Add measured series one by one.
     for aqiType in species:
-        fig.add_trace(go.Scatter(
+        fig.add_trace(go.Scattergl(
             x=records["measurement_ts"], y=records[aqiType],
             mode="markers+lines",
             hovertemplate='%{y}',

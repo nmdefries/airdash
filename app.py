@@ -5,6 +5,7 @@
 TODO:
     - Feature to add past data from https://www.purpleair.com/sensorlist or ThingSpeak API
     - Display hourly forecast
+    - Temperature unit setting in user_settings
 """
 
 # Running app and building webpage.
@@ -23,7 +24,8 @@ import page_helper as ph  # Functions to fetch data and build plots
 
 # Managing database.
 import psycopg2
-import psycopg2.extras
+from psycopg2 import extras
+from psycopg2 import pool
 import database_management as dm
 
 import user_settings as us  # JSON header verification, API key, etc.
@@ -38,10 +40,9 @@ app.title = 'PurpleAir Monitoring'
 server = app.server
 
 
-# Get read-only DB connection for fetching data.
-conn = psycopg2.connect(
-    us.databaseUrl, cursor_factory=psycopg2.extras.DictCursor)
-conn.set_session(readonly=True)
+# Get DB connection pool for fetching data.
+connPool = pool.ThreadedConnectionPool(
+    1, 10, us.databaseUrl, cursor_factory=extras.DictCursor)
 
 
 # Get read and write DB connection for managing database. Initialize DB object.
@@ -242,21 +243,22 @@ def displayCustomDateRangePicker(standardDate):
      dash.dependencies.Input('temp-unit-picker', 'value'),
      dash.dependencies.Input('fetch-interval', 'n_intervals')])
 def updateTempPlot(standardDate, customStart, customEnd, tempUnit, n):
-    records = ph.fetchSensorData(conn, tempUnit, standardDate, [
+    records = ph.fetchSensorData(connPool, tempUnit, standardDate, [
         customStart, customEnd])
-    weather = ph.fetchWeatherDataNewTimeRange(conn, tempUnit, standardDate, [
+    weather = ph.fetchWeatherDataNewTimeRange(connPool, tempUnit, standardDate, [
         customStart, customEnd])
 
     records = ph.correctTemp(records, tempUnit)
 
     fig = ph.temp_vs_time(records, tempUnit)
-    fig.add_trace(go.Scatter(x=weather.ts, y=weather[tempUnit],
-                             mode='markers+lines', line={"color": "rgb(175,175,175)"},
-                             hovertemplate='%{y:.1f}',
-                             name='Official outside'))
+    fig.add_trace(go.Scattergl(x=weather.ts, y=weather[tempUnit],
+                               mode='markers+lines', line={"color": "rgb(175,175,175)"},
+                               hovertemplate='%{y:.1f}',
+                               name='Official outside'))
 
-    currentRecords = ph.fetchSensorData(conn, tempUnit, '1 day')
-    currentWeather = ph.fetchWeatherDataNewTimeRange(conn, tempUnit, '1 day')
+    currentRecords = ph.fetchSensorData(connPool, tempUnit, '1 day')
+    currentWeather = ph.fetchWeatherDataNewTimeRange(
+        connPool, tempUnit, '1 day')
 
     currentRecords = ph.correctTemp(currentRecords, tempUnit)
 
@@ -281,18 +283,18 @@ def updateTempPlot(standardDate, customStart, customEnd, tempUnit, n):
      dash.dependencies.Input('custom-date-range-picker', 'end_date'),
      dash.dependencies.Input('fetch-interval', 'n_intervals')])
 def updateHumidPlot(standardDate, customStart, customEnd, n):
-    records = ph.fetchSensorData(conn, "humidity", standardDate, [
+    records = ph.fetchSensorData(connPool, "humidity", standardDate, [
         customStart, customEnd])
-    weather = ph.fetchWeatherDataNewTimeRange(conn, "humidity", standardDate, [
+    weather = ph.fetchWeatherDataNewTimeRange(connPool, "humidity", standardDate, [
         customStart, customEnd])
 
     records = ph.correctHumid(records)
 
     fig = ph.humid_vs_time(records)
-    fig.add_trace(go.Scatter(x=weather.ts, y=weather.humidity,
-                             mode='markers+lines', line={"color": "rgb(175,175,175)"},
-                             hovertemplate='%{y}',
-                             name='Official outside'))
+    fig.add_trace(go.Scattergl(x=weather.ts, y=weather.humidity,
+                               mode='markers+lines', line={"color": "rgb(175,175,175)"},
+                               hovertemplate='%{y}',
+                               name='Official outside'))
 
     return fig
 
@@ -311,11 +313,11 @@ def updateAqiPlot(standardDate, customStart, customEnd, aqiSpecies, n):
         # Default to showing PM 2.5.
         aqiSpecies = ["pm_2_5_aqi"]
 
-    records = ph.fetchSensorData(conn, aqiSpecies, standardDate, [
+    records = ph.fetchSensorData(connPool, aqiSpecies, standardDate, [
         customStart, customEnd])
 
     warningMessage, style = ph.fetchAqiWarningInfo(
-        conn,
+        connPool,
         aqiSpecies,
         standardDate,
         [customStart, customEnd])
@@ -341,7 +343,7 @@ def updateDailyForecast(forecastsToDisplay, tempUnit, n):
     columns = ['weather_type_id', 'short_weather_descrip', 'detail_weather_descrip',
                'weather_icon', 'precip_chance', 'uvi'] + tempSelector[tempUnit]
 
-    records = ph.fetchDailyForecastData(conn, columns)
+    records = ph.fetchDailyForecastData(connPool, columns)
 
     blockStyle = {
         'backgroundColor': 'rgba(223,231,244,1.0)',
